@@ -28,6 +28,7 @@ export function hojeISO() {
 export const STATUS = {
   aberto: 'Em aberto',
   aprovado: 'Aprovado',
+  pago: 'Pago',
   recusado: 'Recusado',
 } as const;
 export type Status = keyof typeof STATUS;
