@@ -56,4 +56,5 @@ export interface Clinica {
   endereco: string;
   telefone: string;
   email: string;
+  logo: string; // imagem em data URL (data:image/png;base64,...) ou ''
 }

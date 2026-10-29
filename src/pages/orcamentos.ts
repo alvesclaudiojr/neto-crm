@@ -376,7 +376,10 @@ export async function imprimirOrcamento(alvo: HTMLElement, id: number) {
       h(
         'header',
         { class: 'folha-topo' },
-        h('div', null, h('h1', null, clinica.nome || 'Consultório'), clinica.profissional ? h('p', null, [clinica.profissional, clinica.registro].filter(Boolean).join(' · ')) : null),
+        // a logo normalmente já traz nome e registro; sem logo, vai em texto
+        clinica.logo
+          ? h('img', { class: 'folha-logo', src: clinica.logo, alt: [clinica.profissional || clinica.nome, clinica.registro].filter(Boolean).join(' · ') })
+          : h('div', null, h('h1', null, clinica.nome || 'Consultório'), clinica.profissional ? h('p', null, [clinica.profissional, clinica.registro].filter(Boolean).join(' · ')) : null),
         h('div', { class: 'folha-num' }, h('h2', null, `Orçamento nº ${id}`), h('p', null, `Emitido em ${dataBR(orc.data)}`), h('p', null, `Válido até ${dataBR(somarDias(orc.data, orc.validade_dias))}`)),
       ),
       h('section', null, h('h3', null, 'Paciente'), linhaDado('Nome', c.nome), linhaDado('Telefone', c.telefone), linhaDado('E-mail', c.email)),

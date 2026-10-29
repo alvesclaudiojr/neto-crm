@@ -11,6 +11,7 @@ export async function paginaConfiguracoes(alvo: HTMLElement, com2fa: boolean, eh
     alvo,
     h('h1', null, 'Configurações'),
     secaoClinica(clinica),
+    secaoLogo(clinica.logo),
     secaoSenha(),
     secao2fa(com2fa, recarregar),
     secaoBackup(),
@@ -75,6 +76,82 @@ function secaoClinica(c: Clinica) {
     h('div', { class: 'acoes' }, btn, msg),
   );
   return h('section', null, h('h2', null, 'Dados da clínica (aparecem no orçamento)'), form);
+}
+
+const TIPOS_LOGO = ['image/png', 'image/jpeg', 'image/webp'];
+
+const lerComoDataURL = (arquivo: Blob) =>
+  new Promise<string>((ok, falha) => {
+    const r = new FileReader();
+    r.onload = () => ok(String(r.result));
+    r.onerror = () => falha(new Error('Não foi possível ler a imagem.'));
+    r.readAsDataURL(arquivo);
+  });
+
+/**
+ * A logo fica no próprio banco como data URL (sem serviço de arquivos à parte).
+ * Imagem grande é reduzida para caber no topo da folha sem pesar no banco.
+ */
+async function prepararLogo(arquivo: File) {
+  if (!TIPOS_LOGO.includes(arquivo.type)) throw new Error('Use uma imagem PNG, JPG ou WEBP.');
+  if (arquivo.size <= 300_000) return lerComoDataURL(arquivo);
+
+  const img = new Image();
+  img.src = URL.createObjectURL(arquivo);
+  await img.decode().catch(() => {
+    throw new Error('Não foi possível abrir a imagem.');
+  });
+  URL.revokeObjectURL(img.src);
+  const escala = Math.min(1, 900 / img.naturalWidth, 400 / img.naturalHeight);
+  const tela = h('canvas', { width: Math.round(img.naturalWidth * escala), height: Math.round(img.naturalHeight * escala) });
+  tela.getContext('2d')!.drawImage(img, 0, 0, tela.width, tela.height);
+  // JPG continua JPG; PNG/WEBP viram PNG para manter o fundo transparente
+  const url = arquivo.type === 'image/jpeg' ? tela.toDataURL('image/jpeg', 0.9) : tela.toDataURL('image/png');
+  if (url.length > 650_000) throw new Error('Imagem grande demais. Use uma logo menor (até ~400 kB).');
+  return url;
+}
+
+function secaoLogo(atual: string) {
+  const msg = h('div');
+  const previa = h('img', { class: 'previa-logo', alt: 'Logo atual', hidden: !atual, src: atual || null });
+  const semLogo = h('p', { class: 'dica', hidden: !!atual }, 'Nenhuma logo. O orçamento mostra o nome da clínica em texto.');
+  const arquivo = h('input', { type: 'file', accept: TIPOS_LOGO.join(',') });
+  const remover = h('button', { type: 'button', class: 'secundario', hidden: !atual }, 'Remover logo');
+
+  async function salvar(logo: string) {
+    must(await supabase.from('clinica').update({ logo }).eq('id', 1));
+    previa.src = logo;
+    previa.hidden = !logo;
+    semLogo.hidden = !!logo;
+    remover.hidden = !logo;
+  }
+
+  arquivo.addEventListener('change', () =>
+    acao(null, msg, async () => {
+      const f = arquivo.files?.[0];
+      if (!f) return;
+      await salvar(await prepararLogo(f));
+      arquivo.value = '';
+      msg.replaceChildren(aviso('Logo salva. Ela aparece no topo do orçamento impresso.', 'ok'));
+    }),
+  );
+  remover.addEventListener('click', () =>
+    acao(remover, msg, async () => {
+      await salvar('');
+      msg.replaceChildren(aviso('Logo removida.', 'ok'));
+    }),
+  );
+
+  return h(
+    'section',
+    null,
+    h('h2', null, 'Logo do orçamento'),
+    h('p', { class: 'dica' }, 'Aparece no topo do orçamento impresso, no lugar do nome da clínica. De preferência PNG com fundo transparente.'),
+    previa,
+    semLogo,
+    h('div', { class: 'linha' }, arquivo, remover),
+    msg,
+  );
 }
 
 function secaoSenha() {

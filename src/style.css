@@ -157,6 +157,8 @@ table.itens { margin: 1rem 0; display: block; overflow-x: auto; }
 .folha-topo h1 { margin: 0; color: var(--primaria); }
 .folha-topo p, .folha section p { margin: 0.2rem 0; }
 .folha-num { text-align: right; }
+.folha-logo { display: block; max-width: 320px; max-height: 100px; object-fit: contain; }
+.previa-logo { display: block; max-width: 320px; max-height: 100px; object-fit: contain; margin-bottom: 0.75rem; padding: 0.5rem; background: #fff; border: 1px solid var(--borda); border-radius: 6px; }
 .folha-num h2 { margin: 0; }
 .folha h3 { font-size: 1rem; border-bottom: 1px solid var(--borda); padding-bottom: 0.3rem; }
 .folha table { margin: 1.5rem 0; }
