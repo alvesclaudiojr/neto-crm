@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+.env.local
+# backups exportados pelo app têm dados de pacientes: nunca versionar
+*backup*.json
+
+# configuração local do Claude Code
+.claude/
