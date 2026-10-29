@@ -1,4 +1,4 @@
-import { chamarFuncao } from '../lib/supabase';
+import { chamarFuncao, loginParaEmail, emailParaLogin, semEmail, LOGIN_VALIDO } from '../lib/supabase';
 import { h, mount, lerForm, campo, aviso, acao } from '../lib/dom';
 import { dataHoraBR } from '../lib/format';
 
@@ -50,7 +50,7 @@ export async function paginaUsuarios(alvo: HTMLElement) {
       h(
         'table',
         null,
-        h('thead', null, h('tr', null, h('th', null, 'Nome'), h('th', null, 'E-mail'), h('th', null, 'Situação'), h('th', null, 'Último acesso'), h('th'))),
+        h('thead', null, h('tr', null, h('th', null, 'Nome'), h('th', null, 'Login'), h('th', null, 'Situação'), h('th', null, 'Último acesso'), h('th'))),
         h('tbody', null, dados.map(linha)),
       ),
     );
@@ -80,14 +80,14 @@ export async function paginaUsuarios(alvo: HTMLElement) {
       acoes = ['Você'];
     } else if (!u.liberado) {
       acoes = [
-        botao('Dar acesso', 'secundario', `Liberar o acesso de ${u.email}? Será gerada uma senha provisória.`, async () => {
+        botao('Dar acesso', 'secundario', `Liberar o acesso de ${emailParaLogin(u.email)}? Será gerada uma senha provisória.`, async () => {
           const nomeNovo = prompt('Nome do dentista (aparece no topo do sistema):', '')?.trim();
           if (!nomeNovo) return;
           const { senha } = await usuarios<{ senha: string }>({ acao: 'liberar', user_id: u.user_id, nome: nomeNovo });
           await carregar();
           mostrarSenha(nomeNovo, senha);
         }),
-        botao('Apagar', 'perigo', `Apagar o login ${u.email}?`, async () => {
+        botao('Apagar', 'perigo', `Apagar o login ${emailParaLogin(u.email)}?`, async () => {
           await usuarios({ acao: 'remover', user_id: u.user_id });
           await carregar();
           msg.replaceChildren(aviso('Login apagado.', 'ok'));
@@ -118,7 +118,7 @@ export async function paginaUsuarios(alvo: HTMLElement) {
       'tr',
       null,
       h('td', null, nome),
-      h('td', null, u.email),
+      h('td', null, emailParaLogin(u.email)),
       h('td', null, situacao(u)),
       h('td', null, u.ultimo_acesso ? dataHoraBR(u.ultimo_acesso) : 'nunca'),
       h('td', null, h('div', { class: 'botoes-linha' }, acoes)),
@@ -135,7 +135,11 @@ export async function paginaUsuarios(alvo: HTMLElement) {
         const v = lerForm(form);
         const ehAdmin = (form.elements.namedItem('admin') as HTMLInputElement).checked;
         acao(btnCriar, msg, async () => {
-          const { senha } = await usuarios<{ senha: string }>({ acao: 'criar', nome: v.nome, email: v.email, admin: ehAdmin });
+          const login = v.login.toLowerCase();
+          if (semEmail(login) && !LOGIN_VALIDO.test(login)) {
+            throw new Error('Usuário: de 3 a 30 caracteres, só letras minúsculas sem acento, números, ponto, hífen ou sublinhado.');
+          }
+          const { senha } = await usuarios<{ senha: string }>({ acao: 'criar', nome: v.nome, email: loginParaEmail(login), admin: ehAdmin });
           form.reset();
           await carregar();
           mostrarSenha(v.nome, senha);
@@ -143,7 +147,11 @@ export async function paginaUsuarios(alvo: HTMLElement) {
       },
     },
     campo('Nome *', h('input', { name: 'nome', required: true, placeholder: 'Ex.: Dra. Ana' })),
-    campo('E-mail *', h('input', { name: 'email', type: 'email', required: true, autocomplete: 'off' })),
+    campo(
+      'E-mail ou usuário *',
+      h('input', { name: 'login', required: true, autocomplete: 'off', autocapitalize: 'none', spellcheck: false, placeholder: 'ex.: ana@gmail.com ou ana' }),
+      'Sem e-mail: use um nome curto (ex.: neto). Ele entra digitando só esse nome.',
+    ),
     h(
       'label',
       { class: 'campo-check' },

@@ -19,6 +19,27 @@ type Sucesso<R extends Resposta> = [Extract<R, { error: null }>] extends [never]
   ? NonNullable<R['data']>
   : Extract<R, { error: null }>['data'];
 
+// O Supabase exige e-mail no login. Quem não tem e-mail entra com um nome de
+// usuário, guardado como e-mail interno num domínio reservado (.invalid), que
+// nunca recebe mensagem: então "esqueci minha senha" não serve para esses
+// usuários, e o administrador gera uma nova senha na tela Usuários.
+const DOMINIO_SEM_EMAIL = 'usuarios.invalid';
+
+export function loginParaEmail(login: string) {
+  const l = login.trim().toLowerCase();
+  return l.includes('@') ? l : `${l}@${DOMINIO_SEM_EMAIL}`;
+}
+
+export function emailParaLogin(email: string) {
+  const sufixo = `@${DOMINIO_SEM_EMAIL}`;
+  return email.endsWith(sufixo) ? email.slice(0, -sufixo.length) : email;
+}
+
+export const semEmail = (login: string) => !login.includes('@');
+
+/** Nome de usuário: letras minúsculas, números, ponto, hífen e sublinhado. */
+export const LOGIN_VALIDO = /^[a-z0-9._-]{3,30}$/;
+
 /** Chama uma Edge Function e devolve o JSON; o erro vem no campo `erro` da resposta. */
 export async function chamarFuncao<T>(nome: string, corpo: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke(nome, { body: corpo });

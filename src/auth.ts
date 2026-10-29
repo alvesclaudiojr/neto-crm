@@ -1,4 +1,4 @@
-import { supabase, must } from './lib/supabase';
+import { supabase, must, loginParaEmail, semEmail } from './lib/supabase';
 import { h, mount, lerForm, campo, aviso, acao } from './lib/dom';
 
 type Seguir = () => void | Promise<void>;
@@ -25,19 +25,22 @@ export function telaLogin(root: HTMLElement, seguir: Seguir) {
     {
       onsubmit: (e: Event) => {
         e.preventDefault();
-        const { email, senha } = lerForm(form);
+        const { login, senha } = lerForm(form);
         acao(btn, msg, async () => {
-          const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
+          const { error } = await supabase.auth.signInWithPassword({ email: loginParaEmail(login), password: senha });
           if (error?.name === 'AuthRetryableFetchError') {
             throw new Error('Sem conexão com o servidor. Verifique a internet e tente de novo.');
           }
           // mensagem genérica: não revela se o e-mail existe
-          if (error) throw new Error('E-mail ou senha inválidos.');
+          if (error) throw new Error('Usuário ou senha inválidos.');
           seguir();
         });
       },
     },
-    campo('E-mail', h('input', { name: 'email', type: 'email', required: true, autocomplete: 'username' })),
+    campo(
+      'E-mail ou usuário',
+      h('input', { name: 'login', required: true, autocomplete: 'username', autocapitalize: 'none', spellcheck: false }),
+    ),
     campo('Senha', h('input', { name: 'senha', type: 'password', required: true, autocomplete: 'current-password' })),
     msg,
     btn,
@@ -56,6 +59,9 @@ function telaEsqueci(root: HTMLElement, seguir: Seguir) {
         e.preventDefault();
         const { email } = lerForm(form);
         acao(btn, msg, async () => {
+          if (semEmail(email)) {
+            throw new Error('Usuário sem e-mail não recebe link. Peça ao administrador uma nova senha (tela Usuários).');
+          }
           await supabase.auth.resetPasswordForEmail(email, {
             redirectTo: location.origin + location.pathname,
           });
@@ -64,7 +70,7 @@ function telaEsqueci(root: HTMLElement, seguir: Seguir) {
         });
       },
     },
-    campo('E-mail', h('input', { name: 'email', type: 'email', required: true })),
+    campo('E-mail', h('input', { name: 'email', required: true })),
     msg,
     btn,
     h('button', { type: 'button', class: 'link', onclick: () => telaLogin(root, seguir) }, 'Voltar'),
