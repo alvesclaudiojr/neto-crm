@@ -29,6 +29,8 @@ supabase.auth.onAuthStateChange((evento) => {
     recuperandoSenha = true;
     setTimeout(iniciar);
   } else if (evento === 'SIGNED_OUT') {
+    // volta para o endereço inicial: o próximo login começa nos orçamentos
+    history.replaceState(null, '', location.pathname);
     setTimeout(iniciar);
   }
 });
