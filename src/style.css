@@ -164,6 +164,7 @@ table.itens { margin: 1rem 0; display: block; overflow-x: auto; }
 .folha table { margin: 1.5rem 0; }
 .folha tfoot td { border-bottom: none; font-size: 1.1rem; }
 .assinatura { margin: 4rem auto 2rem; width: 60%; border-top: 1px solid var(--texto); text-align: center; padding-top: 0.3rem; }
+.assinatura small { display: block; color: var(--suave); font-size: 0.9rem; }
 .folha-rodape { text-align: center; color: var(--suave); font-size: 0.85rem; border-top: 1px solid var(--borda); padding-top: 0.75rem; }
 
 @media (max-width: 640px) {

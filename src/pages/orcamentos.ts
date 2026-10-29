@@ -424,7 +424,12 @@ export async function imprimirOrcamento(alvo: HTMLElement, id: number) {
         ),
       ),
       orc.observacoes ? h('section', null, h('h3', null, 'Observações'), h('p', { class: 'pre' }, orc.observacoes)) : null,
-      h('div', { class: 'assinatura' }, h('span', null, clinica.profissional || 'Assinatura')),
+      h(
+        'div',
+        { class: 'assinatura' },
+        h('span', null, clinica.profissional || 'Assinatura'),
+        clinica.registro ? h('small', null, clinica.registro) : null,
+      ),
       h('footer', { class: 'folha-rodape' }, [clinica.endereco, clinica.telefone, clinica.email].filter(Boolean).join(' · ')),
     ),
   );
