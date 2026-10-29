@@ -155,3 +155,17 @@ table.itens { margin: 1rem 0; display: block; overflow-x: auto; }
   .folha { border: none; padding: 0; margin: 0; max-width: none; }
   .folha-topo, .assinatura { break-inside: avoid; }
 }
+
+/* resumo de valores e descontos do orçamento */
+.barra-topo { align-items: flex-start; }
+.resumo { margin-left: auto; min-width: 280px; display: grid; gap: 0.35rem; }
+.resumo > div { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.resumo > div[hidden] { display: none; }
+.desconto-geral { display: flex; align-items: center; gap: 0.35rem; }
+.desconto-geral input.num { width: 6rem; }
+select.curto { width: auto; }
+.resumo-total { border-top: 1px solid var(--borda); padding-top: 0.4rem; font-size: 1.15rem; }
+.obs-item { display: block; color: var(--suave); font-size: 0.85rem; }
+.folha tfoot td { padding-top: 0.3rem; padding-bottom: 0.3rem; font-size: 0.95rem; }
+.folha tfoot tr.riscado td:last-child { text-decoration: line-through; color: var(--suave); }
+.folha tfoot tr.folha-total td { font-size: 1.15rem; border-top: 2px solid var(--texto); padding-top: 0.5rem; }

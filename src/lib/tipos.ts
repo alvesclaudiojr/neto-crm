@@ -1,4 +1,5 @@
 import type { Status } from './format';
+import type { TipoDesconto } from './calculo';
 
 export interface Cliente {
   id: number;
@@ -34,6 +35,8 @@ export interface Orcamento {
   validade_dias: number;
   status: Status;
   observacoes: string | null;
+  desconto_tipo: TipoDesconto;
+  desconto_valor: number;
 }
 
 export interface ItemOrcamento {
@@ -41,6 +44,7 @@ export interface ItemOrcamento {
   descricao: string;
   quantidade: number;
   preco_unitario: number;
+  desconto_pct: number;
   observacao: string | null;
 }
 

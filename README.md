@@ -27,7 +27,9 @@ autenticador protegido, não deixar o PC destravado, e guardar os backups em loc
 
 ### 1. Supabase
 1. Criar conta e um projeto em https://supabase.com. Em **Region**, escolha **South America (São Paulo)**.
-2. **SQL Editor → New query:** cole `supabase/migrations/0001_inicial.sql` e clique em **Run**.
+2. **SQL Editor → New query:** cole e rode, **em ordem**, cada arquivo de `supabase/migrations/`
+   (`0001_inicial.sql`, `0002_descontos.sql`, …). O aviso de "destructive operation" é esperado
+   (vem do `delete` dentro da função de salvar orçamento).
 3. **Authentication → Sign In / Providers → Email:** desligue **Allow new users to sign up**.
 4. **Authentication → Multi-Factor:** confira se **TOTP** está habilitado (é o padrão).
 5. **Authentication → URL Configuration:** em **Site URL** e **Redirect URLs**, coloque o endereço do site

@@ -1,11 +1,8 @@
 import { supabase, must } from '../lib/supabase';
 import { h, mount, campo, aviso, acao } from '../lib/dom';
 import { centavos, moeda, dataBR, somarDias, hojeISO, STATUS, type Status } from '../lib/format';
+import { calcularTotais, liquidoItem, pct, type ItemCalc, type TipoDesconto } from '../lib/calculo';
 import type { Cliente, Clinica, ItemOrcamento, Orcamento, Procedimento } from '../lib/tipos';
-
-type ItemResumo = Pick<ItemOrcamento, 'quantidade' | 'preco_unitario'>;
-const totalItens = (itens: ItemResumo[]) =>
-  itens.reduce((s, i) => s + i.quantidade * centavos(i.preco_unitario), 0);
 
 export async function listaOrcamentos(alvo: HTMLElement) {
   const lista = h('div');
@@ -19,13 +16,13 @@ export async function listaOrcamentos(alvo: HTMLElement) {
   async function carregar() {
     let q = supabase
       .from('orcamentos')
-      .select('id, data, status, clientes(nome), orcamento_itens(quantidade, preco_unitario)')
+      .select('id, data, status, desconto_tipo, desconto_valor, clientes(nome), orcamento_itens(quantidade, preco_unitario, desconto_pct)')
       .order('id', { ascending: false })
       .limit(200);
     if (filtro.value) q = q.eq('status', filtro.value);
-    const dados = must(await q) as unknown as (Pick<Orcamento, 'id' | 'data' | 'status'> & {
+    const dados = must(await q) as unknown as (Pick<Orcamento, 'id' | 'data' | 'status' | 'desconto_tipo' | 'desconto_valor'> & {
       clientes: { nome: string } | null;
-      orcamento_itens: ItemResumo[];
+      orcamento_itens: ItemCalc[];
     })[];
     mount(
       lista,
@@ -45,7 +42,7 @@ export async function listaOrcamentos(alvo: HTMLElement) {
                   h('td', null, h('a', { href: `#/orcamentos/${o.id}` }, `#${o.id}`)),
                   h('td', null, o.clientes?.nome ?? ''),
                   h('td', null, dataBR(o.data)),
-                  h('td', { class: 'num' }, moeda(totalItens(o.orcamento_itens))),
+                  h('td', { class: 'num' }, moeda(calcularTotais(o.orcamento_itens, o.desconto_tipo, o.desconto_valor).total)),
                   h('td', null, h('span', { class: `status status-${o.status}` }, STATUS[o.status])),
                 ),
               ),
@@ -94,20 +91,57 @@ export async function editorOrcamento(alvo: HTMLElement, id: number | null) {
   );
   const observacoes = h('textarea', { rows: 3 }, orc?.observacoes ?? '');
 
+  const descTipo = h(
+    'select',
+    { class: 'curto', title: 'Tipo do desconto geral' },
+    h('option', { value: 'percentual', selected: (orc?.desconto_tipo ?? 'percentual') === 'percentual' }, '%'),
+    h('option', { value: 'valor', selected: orc?.desconto_tipo === 'valor' }, 'R$'),
+  );
+  const descValor = h('input', {
+    type: 'number',
+    min: '0',
+    step: '0.01',
+    value: String(Number(orc?.desconto_valor ?? 0)),
+    class: 'num',
+    title: 'Desconto aplicado sobre a soma dos itens',
+  });
+
   const corpo = h('tbody');
+  const brutoEl = h('span');
+  const descItensEl = h('span');
+  const descGeralEl = h('span');
   const totalEl = h('strong');
+  const linhaDescItens = h('div', null, h('span', null, 'Descontos nos itens'), descItensEl);
   const ativos = procedimentos.filter((p) => p.ativo);
 
-  function atualizarTotal() {
-    let total = 0;
-    for (const tr of corpo.rows) {
-      const q = Number((tr.querySelector('[data-q]') as HTMLInputElement).value) || 0;
-      const p = centavos((tr.querySelector('[data-p]') as HTMLInputElement).value || 0);
-      (tr.querySelector('[data-sub]') as HTMLElement).textContent = moeda(q * p);
-      total += q * p;
-    }
-    totalEl.textContent = moeda(total);
+  const valorCampo = (tr: HTMLTableRowElement, attr: string) => (tr.querySelector(`[${attr}]`) as HTMLInputElement).value;
+
+  function lerItens() {
+    return [...corpo.rows].map((tr) => ({
+      procedimento_id: Number(tr.querySelector('select')!.value) || null,
+      descricao: valorCampo(tr, 'data-d').trim(),
+      quantidade: Number(valorCampo(tr, 'data-q')),
+      preco_unitario: valorCampo(tr, 'data-p'),
+      desconto_pct: Number(valorCampo(tr, 'data-dp')) || 0,
+      observacao: valorCampo(tr, 'data-o').trim(),
+    }));
   }
+
+  function atualizarTotal() {
+    const itens = lerItens();
+    [...corpo.rows].forEach((tr, n) => {
+      (tr.querySelector('[data-sub]') as HTMLElement).textContent = moeda(liquidoItem(itens[n]));
+    });
+    descValor.max = descTipo.value === 'percentual' ? '100' : '';
+    const t = calcularTotais(itens, descTipo.value as TipoDesconto, descValor.value);
+    brutoEl.textContent = moeda(t.bruto);
+    descItensEl.textContent = `− ${moeda(t.descontoItens)}`;
+    linhaDescItens.hidden = t.descontoItens === 0;
+    descGeralEl.textContent = `− ${moeda(t.descontoGeral)}`;
+    totalEl.textContent = moeda(t.total);
+  }
+  descTipo.addEventListener('change', atualizarTotal);
+  descValor.addEventListener('input', atualizarTotal);
 
   function linhaItem(item?: ItemOrcamento) {
     // inclui o procedimento atual mesmo se foi inativado depois
@@ -123,7 +157,8 @@ export async function editorOrcamento(alvo: HTMLElement, id: number | null) {
     const desc = h('input', { value: item?.descricao ?? '', required: true, 'data-d': true });
     const qtd = h('input', { type: 'number', min: '1', step: '1', value: String(item?.quantidade ?? 1), required: true, class: 'num curto', 'data-q': true });
     const preco = h('input', { type: 'number', min: '0', step: '0.01', value: item ? Number(item.preco_unitario).toFixed(2) : '', required: true, class: 'num', 'data-p': true });
-    const obs = h('input', { value: item?.observacao ?? '', placeholder: 'ex.: 10% de desconto', 'data-o': true });
+    const descPct = h('input', { type: 'number', min: '0', max: '100', step: '0.01', value: String(Number(item?.desconto_pct ?? 0)), class: 'num curto', 'data-dp': true, title: 'Desconto deste item, em %' });
+    const obs = h('input', { value: item?.observacao ?? '', placeholder: 'ex.: dente 36', 'data-o': true });
 
     sel.addEventListener('change', () => {
       const p = procedimentos.find((x) => String(x.id) === sel.value);
@@ -140,6 +175,7 @@ export async function editorOrcamento(alvo: HTMLElement, id: number | null) {
       h('td', null, desc),
       h('td', null, qtd),
       h('td', null, preco),
+      h('td', null, descPct),
       h('td', null, obs),
       h('td', { class: 'num', 'data-sub': true }),
       h('td', null, h('button', { type: 'button', class: 'link', title: 'Remover item', onclick: () => { tr.remove(); atualizarTotal(); } }, '✕')),
@@ -158,13 +194,7 @@ export async function editorOrcamento(alvo: HTMLElement, id: number | null) {
     {
       onsubmit: (e: Event) => {
         e.preventDefault();
-        const itens = [...corpo.rows].map((tr) => ({
-          procedimento_id: Number(tr.querySelector('select')!.value) || null,
-          descricao: (tr.querySelector('[data-d]') as HTMLInputElement).value.trim(),
-          quantidade: Number((tr.querySelector('[data-q]') as HTMLInputElement).value),
-          preco_unitario: (tr.querySelector('[data-p]') as HTMLInputElement).value,
-          observacao: (tr.querySelector('[data-o]') as HTMLInputElement).value.trim(),
-        }));
+        const itens = lerItens();
         acao(btnSalvar, msg, async () => {
           if (itens.length === 0) throw new Error('Adicione pelo menos um item.');
           const novoId = must(
@@ -176,6 +206,8 @@ export async function editorOrcamento(alvo: HTMLElement, id: number | null) {
                 validade_dias: Number(validade.value),
                 status: status.value as Status,
                 observacoes: observacoes.value.trim(),
+                desconto_tipo: descTipo.value as TipoDesconto,
+                desconto_valor: Number(descValor.value) || 0,
               },
               p_itens: itens,
             }),
@@ -196,10 +228,22 @@ export async function editorOrcamento(alvo: HTMLElement, id: number | null) {
     h(
       'table',
       { class: 'itens' },
-      h('thead', null, h('tr', null, h('th', null, 'Catálogo'), h('th', null, 'Descrição'), h('th', null, 'Qtd'), h('th', null, 'Valor unit.'), h('th', null, 'Obs.'), h('th', { class: 'num' }, 'Subtotal'), h('th'))),
+      h('thead', null, h('tr', null, h('th', null, 'Catálogo'), h('th', null, 'Descrição'), h('th', null, 'Qtd'), h('th', null, 'Valor unit.'), h('th', null, 'Desc. %'), h('th', null, 'Obs.'), h('th', { class: 'num' }, 'Subtotal'), h('th'))),
       corpo,
     ),
-    h('div', { class: 'barra' }, h('button', { type: 'button', class: 'secundario', onclick: () => linhaItem() }, '+ Adicionar item'), h('p', { class: 'total' }, 'Total: ', totalEl)),
+    h(
+      'div',
+      { class: 'barra barra-topo' },
+      h('button', { type: 'button', class: 'secundario', onclick: () => linhaItem() }, '+ Adicionar item'),
+      h(
+        'div',
+        { class: 'resumo' },
+        h('div', null, h('span', null, 'Soma dos itens'), brutoEl),
+        linhaDescItens,
+        h('div', null, h('label', { class: 'desconto-geral' }, 'Desconto geral ', descValor, descTipo), descGeralEl),
+        h('div', { class: 'resumo-total' }, h('span', null, 'Total'), totalEl),
+      ),
+    ),
     campo('Observações gerais', observacoes),
     h(
       'div',
@@ -248,6 +292,14 @@ export async function imprimirOrcamento(alvo: HTMLElement, id: number) {
   document.title = `Orçamento ${id} - ${c.nome}`;
   const linhaDado = (rotulo: string, valor: string | null) => (valor ? h('p', null, h('strong', null, `${rotulo}: `), valor) : null);
 
+  const t = calcularTotais(itens, orc.desconto_tipo, orc.desconto_valor);
+  const temDescItem = itens.some((i) => Number(i.desconto_pct) > 0);
+  const colunas = temDescItem ? 5 : 4;
+  const linhaRodape = (rotulo: string, valor: string, classe?: string) =>
+    h('tr', { class: classe }, h('td', { colSpan: colunas - 1, class: 'num' }, rotulo), h('td', { class: 'num' }, valor));
+  const rotuloDescGeral =
+    orc.desconto_tipo === 'percentual' ? `Desconto (${pct(orc.desconto_valor)})` : 'Desconto';
+
   mount(
     alvo,
     h('div', { class: 'no-print barra-impressao' }, h('button', { type: 'button', onclick: () => window.print() }, 'Imprimir / Salvar PDF')),
@@ -264,7 +316,19 @@ export async function imprimirOrcamento(alvo: HTMLElement, id: number) {
       h(
         'table',
         null,
-        h('thead', null, h('tr', null, h('th', null, 'Descrição'), h('th', null, 'Obs.'), h('th', { class: 'num' }, 'Qtd'), h('th', { class: 'num' }, 'Valor unit.'), h('th', { class: 'num' }, 'Subtotal'))),
+        h(
+          'thead',
+          null,
+          h(
+            'tr',
+            null,
+            h('th', null, 'Descrição'),
+            h('th', { class: 'num' }, 'Qtd'),
+            h('th', { class: 'num' }, 'Valor unit.'),
+            temDescItem ? h('th', { class: 'num' }, 'Desc.') : null,
+            h('th', { class: 'num' }, 'Subtotal'),
+          ),
+        ),
         h(
           'tbody',
           null,
@@ -272,15 +336,22 @@ export async function imprimirOrcamento(alvo: HTMLElement, id: number) {
             h(
               'tr',
               null,
-              h('td', null, i.descricao),
-              h('td', null, i.observacao ?? ''),
+              h('td', null, i.descricao, i.observacao ? h('small', { class: 'obs-item' }, i.observacao) : null),
               h('td', { class: 'num' }, String(i.quantidade)),
               h('td', { class: 'num' }, moeda(centavos(i.preco_unitario))),
-              h('td', { class: 'num' }, moeda(i.quantidade * centavos(i.preco_unitario))),
+              temDescItem ? h('td', { class: 'num' }, Number(i.desconto_pct) > 0 ? pct(i.desconto_pct) : '—') : null,
+              h('td', { class: 'num' }, moeda(liquidoItem(i))),
             ),
           ),
         ),
-        h('tfoot', null, h('tr', null, h('td', { colSpan: 4, class: 'num' }, 'Total'), h('td', { class: 'num' }, h('strong', null, moeda(totalItens(itens)))))),
+        h(
+          'tfoot',
+          null,
+          t.total !== t.bruto ? linhaRodape('Valor sem desconto', moeda(t.bruto), 'riscado') : null,
+          t.descontoItens > 0 ? linhaRodape('Desconto nos itens', `− ${moeda(t.descontoItens)}`) : null,
+          t.descontoGeral > 0 ? linhaRodape(rotuloDescGeral, `− ${moeda(t.descontoGeral)}`) : null,
+          h('tr', { class: 'folha-total' }, h('td', { colSpan: colunas - 1, class: 'num' }, 'Total'), h('td', { class: 'num' }, h('strong', null, moeda(t.total)))),
+        ),
       ),
       orc.observacoes ? h('section', null, h('h3', null, 'Observações'), h('p', { class: 'pre' }, orc.observacoes)) : null,
       h('div', { class: 'assinatura' }, h('span', null, clinica.profissional || 'Assinatura')),
