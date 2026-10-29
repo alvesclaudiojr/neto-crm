@@ -3,6 +3,7 @@ import { h, mount, campo, aviso, acao } from '../lib/dom';
 import { centavos, moeda, dataBR, somarDias, hojeISO, STATUS, type Status } from '../lib/format';
 import { calcularTotais, liquidoItem, pct, type ItemCalc, type TipoDesconto } from '../lib/calculo';
 import type { Cliente, Clinica, ItemOrcamento, Orcamento, Procedimento } from '../lib/tipos';
+import { termoBusca } from './clientes';
 
 export async function listaOrcamentos(alvo: HTMLElement) {
   const lista = h('div');
@@ -60,28 +61,85 @@ export async function listaOrcamentos(alvo: HTMLElement) {
   await carregar();
 }
 
+type ClienteResumo = Pick<Cliente, 'id' | 'nome' | 'telefone'>;
+
+/**
+ * Campo de cliente com busca no servidor: a lista completa não cabe numa
+ * caixa de seleção (a API devolve no máximo 1000 linhas por consulta).
+ */
+function buscaCliente(inicial: ClienteResumo | null) {
+  let escolhido: ClienteResumo | null = inicial;
+  const entrada = h('input', {
+    type: 'search',
+    value: inicial?.nome ?? '',
+    placeholder: 'Digite o nome ou telefone',
+    autocomplete: 'off',
+    required: true,
+  });
+  const opcoes = h('ul', { class: 'opcoes', hidden: true });
+
+  function escolher(c: ClienteResumo) {
+    escolhido = c;
+    entrada.value = c.nome;
+    entrada.setCustomValidity('');
+    opcoes.hidden = true;
+  }
+
+  async function buscar() {
+    const t = termoBusca(entrada.value);
+    if (!t) return void (opcoes.hidden = true);
+    const achados = must(
+      await supabase.from('clientes').select('id, nome, telefone').or(`nome.ilike.*${t}*,telefone.ilike.*${t}*`).order('nome').limit(15),
+    ) as ClienteResumo[];
+    mount(
+      opcoes,
+      achados.length === 0
+        ? h('li', { class: 'vazio' }, 'Nenhum cliente encontrado. ', h('a', { href: '#/clientes/novo' }, 'Cadastrar novo'))
+        : achados.map((c) =>
+            h(
+              'li',
+              null,
+              h(
+                'button',
+                // mousedown: escolhe antes de o campo perder o foco e fechar a lista
+                { type: 'button', onmousedown: (e: Event) => (e.preventDefault(), escolher(c)) },
+                c.nome,
+                c.telefone ? h('small', null, ` · ${c.telefone}`) : null,
+              ),
+            ),
+          ),
+    );
+    opcoes.hidden = false;
+  }
+
+  let timer: number | undefined;
+  entrada.addEventListener('input', () => {
+    escolhido = null; // mudou o texto: precisa escolher de novo na lista
+    entrada.setCustomValidity('Escolha o cliente na lista.');
+    clearTimeout(timer);
+    timer = window.setTimeout(() => buscar().catch((e) => mount(opcoes, h('li', null, String(e.message ?? e)))), 250);
+  });
+  entrada.addEventListener('blur', () => window.setTimeout(() => (opcoes.hidden = true), 150));
+
+  return { el: h('div', { class: 'busca-cliente' }, entrada, opcoes), id: () => escolhido?.id ?? null };
+}
+
 export async function editorOrcamento(alvo: HTMLElement, id: number | null) {
-  const [clientes, procedimentos, orc, itensSalvos] = await Promise.all([
-    supabase.from('clientes').select('id, nome').order('nome').then(must) as Promise<Pick<Cliente, 'id' | 'nome'>[]>,
+  const [procedimentos, orc, itensSalvos] = await Promise.all([
     supabase.from('procedimentos').select('*').order('nome').then(must) as Promise<Procedimento[]>,
     id ? (supabase.from('orcamentos').select('*').eq('id', id).single().then(must) as Promise<Orcamento>) : null,
     id
       ? (supabase.from('orcamento_itens').select('*').eq('orcamento_id', id).order('ordem').then(must) as Promise<ItemOrcamento[]>)
       : [],
   ]);
+  // versão do orçamento que está na tela; o banco recusa salvar se outra pessoa salvou depois
+  let versao = orc?.atualizado_em ?? null;
 
-  if (clientes.length === 0) {
-    mount(alvo, h('h1', null, 'Novo orçamento'), h('p', null, 'Cadastre um cliente primeiro. ', h('a', { href: '#/clientes/novo' }, 'Novo cliente')));
-    return;
-  }
-
-  const clienteInicial = orc?.cliente_id ?? Number(new URLSearchParams(location.hash.split('?')[1]).get('cliente')) ?? 0;
-  const selCliente = h(
-    'select',
-    { required: true },
-    h('option', { value: '' }, '— escolha —'),
-    clientes.map((c) => h('option', { value: String(c.id), selected: c.id === clienteInicial }, c.nome)),
-  );
+  const clienteInicialId = orc?.cliente_id ?? Number(new URLSearchParams(location.hash.split('?')[1]).get('cliente'));
+  const clienteInicial = clienteInicialId
+    ? ((must(await supabase.from('clientes').select('id, nome, telefone').eq('id', clienteInicialId).maybeSingle()) as ClienteResumo | null))
+    : null;
+  const selCliente = buscaCliente(clienteInicial);
   const data = h('input', { type: 'date', value: orc?.data ?? hojeISO(), required: true });
   const validade = h('input', { type: 'number', min: '1', value: String(orc?.validade_dias ?? 30), required: true });
   const status = h(
@@ -197,30 +255,39 @@ export async function editorOrcamento(alvo: HTMLElement, id: number | null) {
         const itens = lerItens();
         acao(btnSalvar, msg, async () => {
           if (itens.length === 0) throw new Error('Adicione pelo menos um item.');
-          const novoId = must(
-            await supabase.rpc('salvar_orcamento', {
-              p_id: id,
-              p_orcamento: {
-                cliente_id: Number(selCliente.value),
-                data: data.value,
-                validade_dias: Number(validade.value),
-                status: status.value as Status,
-                observacoes: observacoes.value.trim(),
-                desconto_tipo: descTipo.value as TipoDesconto,
-                desconto_valor: Number(descValor.value) || 0,
-              },
-              p_itens: itens,
-            }),
-          ) as number;
-          if (id) msg.replaceChildren(aviso('Salvo.', 'ok'));
-          else location.hash = `#/orcamentos/${novoId}`;
+          const clienteId = selCliente.id();
+          if (!clienteId) throw new Error('Escolha o cliente na lista.');
+          const res = await supabase.rpc('salvar_orcamento', {
+            p_id: id,
+            p_orcamento: {
+              cliente_id: clienteId,
+              data: data.value,
+              validade_dias: Number(validade.value),
+              status: status.value as Status,
+              observacoes: observacoes.value.trim(),
+              desconto_tipo: descTipo.value as TipoDesconto,
+              desconto_valor: Number(descValor.value) || 0,
+              atualizado_em: versao,
+            },
+            p_itens: itens,
+          });
+          if (res.error?.message.includes('CONFLITO_EDICAO')) {
+            throw new Error(
+              'Outra pessoa salvou este orçamento depois que você abriu. Suas alterações NÃO foram salvas: anote o que mudou, recarregue a página (F5) e faça de novo.',
+            );
+          }
+          const novoId = must(res) as number;
+          if (!id) return void (location.hash = `#/orcamentos/${novoId}`);
+          const atual = must(await supabase.from('orcamentos').select('atualizado_em').eq('id', id).single());
+          versao = atual.atualizado_em;
+          msg.replaceChildren(aviso('Salvo.', 'ok'));
         });
       },
     },
     h(
       'div',
       { class: 'grade' },
-      campo('Cliente *', selCliente),
+      campo('Cliente *', selCliente.el),
       campo('Data', data),
       campo('Validade (dias)', validade),
       campo('Status', status),

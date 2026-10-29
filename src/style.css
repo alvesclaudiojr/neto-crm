@@ -130,6 +130,18 @@ table.itens { margin: 1rem 0; display: block; overflow-x: auto; }
 .simples li { margin-bottom: 0.4rem; }
 .sugestao { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding: 0.6rem 1.25rem; background: #eff8ff; color: #175cd3; border-bottom: 1px solid var(--borda); }
 .sugestao span { flex: 1; min-width: 220px; }
+/* busca de cliente no orçamento */
+.busca-cliente { position: relative; }
+.busca-cliente input { width: 100%; }
+.opcoes {
+  position: absolute; z-index: 10; left: 0; right: 0; top: 100%; margin: 2px 0 0; padding: 0.25rem; list-style: none;
+  background: var(--superficie); border: 1px solid var(--borda); border-radius: 6px; box-shadow: 0 4px 16px rgb(0 0 0 / 0.1);
+  max-height: 260px; overflow-y: auto;
+}
+.opcoes button { width: 100%; text-align: left; background: none; border: none; color: var(--texto); border-radius: 4px; }
+.opcoes button:hover { background: #f0fdfa; }
+.opcoes small { color: var(--suave); }
+.opcoes .vazio { padding: 0.5rem; }
 .campo-check { display: flex; align-items: center; gap: 0.5rem; grid-column: 1 / -1; }
 .campo-check input { width: auto; }
 .botoes-linha { display: flex; gap: 0.4rem; flex-wrap: wrap; justify-content: flex-end; }

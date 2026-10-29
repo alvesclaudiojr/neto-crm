@@ -73,6 +73,8 @@ npm run dev
 - **Plano gratuito do Supabase:** o projeto é pausado após ~1 semana sem nenhum acesso. É só
   reativar no painel, sem perda de dados. O plano gratuito também não oferece backups para baixar,
   por isso o botão de backup do app.
+- **Restaurar backup:** **Configurações → Restaurar backup** (só administrador) troca todos os dados
+  pelos do arquivo. Antes, o app baixa uma cópia dos dados atuais.
 - **Esqueceu a senha ou perdeu o celular do autenticador:** o administrador usa **Nova senha** ou
   **Zerar autenticador** na tela **Usuários**. No próximo login o app pede para criar a senha ou
   cadastrar o autenticador de novo.

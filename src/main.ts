@@ -136,7 +136,7 @@ async function rotear() {
       case 'procedimentos':
         return paginaProcedimentos(conteudo);
       case 'configuracoes':
-        return paginaConfiguracoes(conteudo, com2fa, iniciarEm('#/configuracoes'));
+        return paginaConfiguracoes(conteudo, com2fa, ehAdmin, iniciarEm('#/configuracoes'));
       case 'usuarios':
         if (ehAdmin) return paginaUsuarios(conteudo);
         location.hash = '#/orcamentos';

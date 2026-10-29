@@ -37,6 +37,7 @@ export interface Orcamento {
   observacoes: string | null;
   desconto_tipo: TipoDesconto;
   desconto_valor: number;
+  atualizado_em: string;
 }
 
 export interface ItemOrcamento {

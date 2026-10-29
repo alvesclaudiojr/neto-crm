@@ -4,7 +4,7 @@ import { hojeISO } from '../lib/format';
 import { validarSenha } from '../auth';
 import type { Clinica } from '../lib/tipos';
 
-export async function paginaConfiguracoes(alvo: HTMLElement, com2fa: boolean, recarregar: () => Promise<void>) {
+export async function paginaConfiguracoes(alvo: HTMLElement, com2fa: boolean, ehAdmin: boolean, recarregar: () => Promise<void>) {
   const clinica = must(await supabase.from('clinica').select('*').single()) as Clinica;
 
   mount(
@@ -14,6 +14,7 @@ export async function paginaConfiguracoes(alvo: HTMLElement, com2fa: boolean, re
     secaoSenha(),
     secao2fa(com2fa, recarregar),
     secaoBackup(),
+    ehAdmin ? secaoRestaurar() : null,
   );
 }
 
@@ -113,17 +114,21 @@ async function lerTudo(tabela: (typeof TABELAS)[number]) {
   }
 }
 
+async function baixarBackup(nome = `consultorio-backup-${hojeISO()}.json`) {
+  const dados: Record<string, unknown> = { gerado_em: new Date().toISOString(), versao: 1 };
+  for (const t of TABELAS) dados[t] = await lerTudo(t);
+  const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  h('a', { href: url, download: nome }).click();
+  URL.revokeObjectURL(url);
+}
+
 function secaoBackup() {
   const msg = h('div');
   const btn = h('button', { type: 'button', class: 'secundario' }, 'Baixar backup');
   btn.addEventListener('click', () =>
     acao(btn, msg, async () => {
-      const dados: Record<string, unknown> = { gerado_em: new Date().toISOString(), versao: 1 };
-      for (const t of TABELAS) dados[t] = await lerTudo(t);
-      const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      h('a', { href: url, download: `consultorio-backup-${hojeISO()}.json` }).click();
-      URL.revokeObjectURL(url);
+      await baixarBackup();
       msg.replaceChildren(aviso('Backup gerado.', 'ok'));
     }),
   );
@@ -137,6 +142,54 @@ function secaoBackup() {
       'Gera um arquivo com todos os dados. Ele contém dados pessoais de pacientes: guarde em local protegido (pasta com senha ou nuvem pessoal) e nunca envie por e-mail ou WhatsApp.',
     ),
     btn,
+    msg,
+  );
+}
+
+const qtd = (v: unknown) => (Array.isArray(v) ? v.length : 0);
+
+function secaoRestaurar() {
+  const msg = h('div');
+  const arquivo = h('input', { type: 'file', accept: '.json,application/json' });
+  const btn = h('button', { type: 'button', class: 'perigo' }, 'Restaurar backup');
+  btn.addEventListener('click', () =>
+    acao(btn, msg, async () => {
+      const f = arquivo.files?.[0];
+      if (!f) throw new Error('Escolha o arquivo de backup (.json).');
+      let dados: Record<string, unknown>;
+      try {
+        dados = JSON.parse(await f.text());
+      } catch {
+        throw new Error('O arquivo não é um backup válido.');
+      }
+      if (!Array.isArray(dados.clientes) || !Array.isArray(dados.orcamentos)) {
+        throw new Error('O arquivo não parece um backup deste sistema.');
+      }
+      const quando = typeof dados.gerado_em === 'string' ? new Date(dados.gerado_em).toLocaleString('pt-BR') : 'data desconhecida';
+      const resumo = `${qtd(dados.clientes)} clientes, ${qtd(dados.orcamentos)} orçamentos e ${qtd(dados.procedimentos)} procedimentos (backup de ${quando})`;
+      if (!confirm(`Restaurar ${resumo}?\n\nTODOS os dados atuais serão substituídos pelos do arquivo. Antes disso, uma cópia dos dados atuais será baixada.`)) return;
+      if (prompt('Para confirmar, digite RESTAURAR:')?.trim().toUpperCase() !== 'RESTAURAR') {
+        throw new Error('Restauração cancelada.');
+      }
+      // rede de segurança: guarda o estado atual antes de trocar
+      await baixarBackup(`consultorio-antes-de-restaurar-${hojeISO()}.json`);
+      const r = must(await supabase.rpc('restaurar_backup', { p_dados: dados })) as Record<string, number>;
+      arquivo.value = '';
+      msg.replaceChildren(
+        aviso(`Backup restaurado: ${r.clientes} clientes, ${r.orcamentos} orçamentos, ${r.procedimentos} procedimentos.`, 'ok'),
+      );
+    }),
+  );
+  return h(
+    'section',
+    null,
+    h('h2', null, 'Restaurar backup'),
+    h(
+      'p',
+      { class: 'dica' },
+      'Substitui todos os dados pelos de um arquivo de backup. Use só em emergência (dados apagados por engano, troca de projeto). Antes de restaurar, o sistema baixa uma cópia dos dados atuais.',
+    ),
+    h('div', { class: 'linha' }, arquivo, btn),
     msg,
   );
 }
