@@ -4,7 +4,7 @@ import { hojeISO } from '../lib/format';
 import { validarSenha } from '../auth';
 import type { Clinica } from '../lib/tipos';
 
-export async function paginaConfiguracoes(alvo: HTMLElement) {
+export async function paginaConfiguracoes(alvo: HTMLElement, com2fa: boolean, recarregar: () => Promise<void>) {
   const clinica = must(await supabase.from('clinica').select('*').single()) as Clinica;
 
   mount(
@@ -12,7 +12,39 @@ export async function paginaConfiguracoes(alvo: HTMLElement) {
     h('h1', null, 'Configurações'),
     secaoClinica(clinica),
     secaoSenha(),
+    secao2fa(com2fa, recarregar),
     secaoBackup(),
+  );
+}
+
+function secao2fa(ativo: boolean, recarregar: () => Promise<void>) {
+  const msg = h('div');
+  if (!ativo) {
+    return h(
+      'section',
+      null,
+      h('h2', null, 'Verificação em duas etapas'),
+      h('p', null, h('span', { class: 'status status-recusado' }, 'Desativada'), ' Recomendado: além da senha, o login pede um código do celular.'),
+      h('a', { class: 'botao', href: '#/ativar-2fa' }, 'Ativar'),
+    );
+  }
+  const btn = h('button', { type: 'button', class: 'perigo' }, 'Desativar');
+  btn.addEventListener('click', () => {
+    if (!confirm('Desativar a verificação em duas etapas? O login passa a pedir só a senha.')) return;
+    acao(btn, msg, async () => {
+      const fatores = must(await supabase.auth.mfa.listFactors());
+      for (const f of fatores.all) must(await supabase.auth.mfa.unenroll({ factorId: f.id }));
+      await supabase.auth.refreshSession();
+      await recarregar();
+    });
+  });
+  return h(
+    'section',
+    null,
+    h('h2', null, 'Verificação em duas etapas'),
+    h('p', null, h('span', { class: 'status status-aprovado' }, 'Ativada'), ' O login pede o código do app autenticador.'),
+    btn,
+    msg,
   );
 }
 

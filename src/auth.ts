@@ -109,8 +109,8 @@ export function validarSenha(senha: string, confirma: string) {
   if (senha !== confirma) throw new Error('As senhas não conferem.');
 }
 
-/** Primeiro acesso: obriga cadastrar o app autenticador (2FA). */
-export async function telaMfaCadastrar(root: HTMLElement, seguir: Seguir) {
+/** Ativa o app autenticador (2FA, opcional). `cancelar` mostra o botão "Agora não". */
+export async function telaMfaCadastrar(root: HTMLElement, seguir: Seguir, cancelar?: () => void) {
   // limpa tentativas anteriores não concluídas
   const fatores = must(await supabase.auth.mfa.listFactors());
   for (const f of fatores.all.filter((f) => f.status === 'unverified')) {
@@ -132,13 +132,13 @@ export async function telaMfaCadastrar(root: HTMLElement, seguir: Seguir) {
         });
       },
     },
-    h('p', null, 'Para proteger os dados dos pacientes, o acesso exige um segundo fator. Instale um app autenticador (Google Authenticator, Microsoft Authenticator, Authy…) no celular e escaneie o código abaixo.'),
+    h('p', null, 'Com a verificação em duas etapas, além da senha o login pede um código do seu celular: mesmo que alguém descubra a senha, não entra. Instale um app autenticador (Google Authenticator, Microsoft Authenticator, Authy…) e escaneie o código abaixo.'),
     h('img', { class: 'qr', src: novo.totp.qr_code, alt: 'QR code do autenticador' }),
     h('details', null, h('summary', null, 'Não consegue escanear? Digite a chave'), h('code', { class: 'segredo' }, novo.totp.secret)),
     campoCodigo(),
     msg,
     btn,
-    botaoSair(),
+    cancelar ? h('button', { type: 'button', class: 'link', onclick: cancelar }, 'Agora não') : botaoSair(),
   );
   mount(root, cartao('Ativar verificação em duas etapas', form));
 }

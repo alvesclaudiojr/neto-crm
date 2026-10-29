@@ -2,7 +2,7 @@
 
 Cadastro de clientes com histórico de contato, catálogo de procedimentos e
 orçamentos com impressão/PDF. Roda no navegador, com login por e-mail e senha
-e verificação em duas etapas (app autenticador) obrigatória.
+e verificação em duas etapas (app autenticador) recomendada.
 
 - **Frontend:** TypeScript + Vite, sem framework, publicado no GitHub Pages.
 - **Banco e login:** [Supabase](https://supabase.com) (Postgres + Auth), plano gratuito.
@@ -12,18 +12,17 @@ e verificação em duas etapas (app autenticador) obrigatória.
 | Camada | O que faz |
 |---|---|
 | Cadastro público desligado | Só o administrador cria usuários, pela tela **Usuários** do app. |
-| Gestão de usuários no servidor | Criar, resetar senha e remover passam pela Edge Function `usuarios`, que guarda a chave secreta e confere de novo se quem pede é administrador com 2FA. |
+| Gestão de usuários no servidor | Criar, resetar senha e remover passam pela Edge Function `usuarios`, que guarda a chave secreta e confere de novo se quem pede é administrador (e, se ele usa 2FA, se passou pelo código). |
 | Senha provisória | Usuário novo (ou com senha resetada) é obrigado a criar a própria senha no primeiro acesso. |
 | Tabela `membros` | Ter login não basta: o usuário precisa estar liberado nela. |
-| 2FA obrigatório | No primeiro acesso o app exige cadastrar o autenticador. O **banco** só libera os dados para sessões que passaram pelo 2FA (`aal2`), então nem um erro no frontend expõe dados. |
+| 2FA recomendado | O app sugere ativar o autenticador (Configurações). Quem ativou é obrigado a usar: o **banco** só libera os dados para essa pessoa depois do código (`aal2`), então descobrir a senha não basta. |
 | RLS em todas as tabelas | As regras ficam no Postgres. A chave "anon" no site é pública por design e sozinha não lê nada. |
 | Sem `innerHTML` | Todo texto digitado é exibido como texto (proteção contra XSS). |
 | CSP no build | O navegador só executa scripts do próprio site e só conversa com o Supabase. |
 | Saída por inatividade | Sessão encerra após 30 min sem uso. |
 | Repositório sem dados | `.env` e backups estão no `.gitignore`. O código pode ser público. |
 
-**O que fica por conta de quem usa:** senha forte e exclusiva, celular com o
-autenticador protegido, não deixar o PC destravado, e guardar os backups em local seguro.
+**O que fica por conta de quem usa:** senha forte e exclusiva, ativar o 2FA, não deixar o PC destravado, e guardar os backups em local seguro.
 
 ## Configuração (uma vez)
 
@@ -64,7 +63,7 @@ npm run dev
 
 ## Uso no dia a dia
 1. Abrir o endereço do site (dá para fixar como app pelo Edge/Chrome: menu → *Instalar*).
-2. Entrar com e-mail e senha, e depois o código de 6 dígitos do celular.
+2. Entrar com e-mail (ou nome de usuário) e senha, e o código do celular se tiver ativado o 2FA.
 3. Antes de tudo, preencher **Configurações → Dados da clínica** (eles saem no orçamento).
 4. Cadastrar procedimentos com preço, depois clientes, depois orçamentos.
 5. No orçamento, **Imprimir / PDF** abre a folha pronta para imprimir ou salvar como PDF.

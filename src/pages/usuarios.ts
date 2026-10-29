@@ -3,7 +3,7 @@ import { h, mount, lerForm, campo, aviso, acao } from '../lib/dom';
 import { dataHoraBR } from '../lib/format';
 
 // Tela só do administrador. Tudo passa pela Edge Function `usuarios`, que
-// confere de novo no servidor se quem chama é administrador com 2FA.
+// confere de novo no servidor se quem chama é administrador.
 
 interface Usuario {
   user_id: string;
@@ -37,7 +37,7 @@ export async function paginaUsuarios(alvo: HTMLElement) {
         { class: 'aviso aviso-info', role: 'status' },
         h('p', null, `Senha provisória de ${quem}:`),
         h('div', { class: 'linha-senha' }, codigo, copiar),
-        h('p', null, 'Passe pessoalmente ou por mensagem e apague depois. No primeiro acesso ele cria a senha dele e ativa o autenticador. Esta senha não será mostrada de novo.'),
+        h('p', null, 'Passe pessoalmente ou por mensagem e apague depois. No primeiro acesso ele cria a senha dele. Esta senha não será mostrada de novo.'),
       ),
     );
   }
@@ -101,7 +101,7 @@ export async function paginaUsuarios(alvo: HTMLElement) {
           mostrarSenha(nome, senha);
         }),
         u.com_2fa
-          ? botao('Zerar autenticador', 'secundario', `Zerar o autenticador de ${nome}? Use quando ele trocar ou perder o celular. No próximo acesso ele cadastra de novo.`, async () => {
+          ? botao('Zerar autenticador', 'secundario', `Zerar o autenticador de ${nome}? Use quando ele trocar ou perder o celular. Ele volta a entrar só com a senha e pode ativar de novo em Configurações.`, async () => {
               await usuarios({ acao: 'resetar_2fa', user_id: u.user_id });
               await carregar();
               msg.replaceChildren(aviso(`Autenticador de ${nome} zerado.`, 'ok'));
@@ -168,7 +168,7 @@ export async function paginaUsuarios(alvo: HTMLElement) {
       'section',
       null,
       h('h2', null, 'Novo acesso'),
-      h('p', { class: 'dica' }, 'O sistema gera uma senha provisória. No primeiro acesso o dentista troca a senha e ativa o autenticador no celular.'),
+      h('p', { class: 'dica' }, 'O sistema gera uma senha provisória. No primeiro acesso o dentista cria a senha dele. A verificação em duas etapas fica como recomendação, em Configurações.'),
       form,
     ),
     msg,

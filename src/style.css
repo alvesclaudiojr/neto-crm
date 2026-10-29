@@ -127,6 +127,8 @@ table.itens { margin: 1rem 0; display: block; overflow-x: auto; }
 .historico p { margin: 0.2rem 0 0; white-space: pre-wrap; }
 .simples { padding-left: 1.2rem; }
 .simples li { margin-bottom: 0.4rem; }
+.sugestao { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding: 0.6rem 1.25rem; background: #eff8ff; color: #175cd3; border-bottom: 1px solid var(--borda); }
+.sugestao span { flex: 1; min-width: 220px; }
 .campo-check { display: flex; align-items: center; gap: 0.5rem; grid-column: 1 / -1; }
 .campo-check input { width: auto; }
 .botoes-linha { display: flex; gap: 0.4rem; flex-wrap: wrap; justify-content: flex-end; }

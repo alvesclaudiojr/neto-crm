@@ -1,6 +1,7 @@
 // Edge Function `usuarios`: gestão de acesso feita pela tela Usuários do app.
 // Roda no servidor do Supabase com a chave secreta (service role), que nunca
-// vai para o navegador. Só atende administrador que já passou pelo 2FA.
+// vai para o navegador. Só atende administrador (e, se ele ativou o 2FA, só
+// depois de passar pelo código).
 //
 // Deploy: painel do Supabase > Edge Functions > Deploy a new function > Via Editor,
 // nome `usuarios`, colar este arquivo. (Ou: supabase functions deploy usuarios)
@@ -49,7 +50,9 @@ Deno.serve(async (req) => {
     const jwt = (req.headers.get('Authorization') ?? '').replace(/^Bearer /, '');
     const { data: quem, error: erroQuem } = await admin.auth.getUser(jwt);
     if (erroQuem || !quem.user) throw new Recusado('Sessão inválida. Entre de novo.', 401);
-    if (claims(jwt).aal !== 'aal2') throw new Recusado('Confirme o código do autenticador antes.', 403);
+    // 2FA é opcional, mas quem ativou precisa ter passado por ele nesta sessão
+    const tem2fa = (quem.user.factors ?? []).some((f) => f.status === 'verified');
+    if (tem2fa && claims(jwt).aal !== 'aal2') throw new Recusado('Confirme o código do autenticador antes.', 403);
     const { data: eu } = await admin.from('membros').select('admin').eq('user_id', quem.user.id).maybeSingle();
     if (!eu?.admin) throw new Recusado('Só o administrador pode gerenciar usuários.', 403);
 
