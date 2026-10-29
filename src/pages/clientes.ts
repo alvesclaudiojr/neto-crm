@@ -102,7 +102,7 @@ export async function fichaCliente(alvo: HTMLElement, id: number | null) {
     campo('Data de nascimento', inp('data_nascimento', { type: 'date' })),
     campo('Endereço', h('textarea', { name: 'endereco', rows: 2 }, c.endereco ?? '')),
     campo('Observações', h('textarea', { name: 'observacoes', rows: 3 }, c.observacoes ?? '')),
-    h('div', { class: 'acoes' }, btn, msg),
+    h('div', { class: 'acoes' }, btn, msg, id ? botaoExcluir(id) : null),
   );
 
   mount(
@@ -111,7 +111,6 @@ export async function fichaCliente(alvo: HTMLElement, id: number | null) {
     form,
     id ? await blocoContatos(id) : null,
     id ? await blocoOrcamentos(id) : null,
-    id ? botaoExcluir(id) : null,
   );
 }
 
@@ -198,5 +197,5 @@ function botaoExcluir(id: number) {
     },
     'Excluir cliente',
   );
-  return h('section', { class: 'zona-perigo' }, btn, msg);
+  return h('span', { class: 'excluir' }, msg, btn);
 }

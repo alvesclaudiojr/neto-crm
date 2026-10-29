@@ -11,7 +11,9 @@ e verificação em duas etapas (app autenticador) obrigatória.
 
 | Camada | O que faz |
 |---|---|
-| Cadastro público desligado | Só o administrador cria usuários no painel do Supabase. |
+| Cadastro público desligado | Só o administrador cria usuários, pela tela **Usuários** do app. |
+| Gestão de usuários no servidor | Criar, resetar senha e remover passam pela Edge Function `usuarios`, que guarda a chave secreta e confere de novo se quem pede é administrador com 2FA. |
+| Senha provisória | Usuário novo (ou com senha resetada) é obrigado a criar a própria senha no primeiro acesso. |
 | Tabela `membros` | Ter login não basta: o usuário precisa estar liberado nela. |
 | 2FA obrigatório | No primeiro acesso o app exige cadastrar o autenticador. O **banco** só libera os dados para sessões que passaram pelo 2FA (`aal2`), então nem um erro no frontend expõe dados. |
 | RLS em todas as tabelas | As regras ficam no Postgres. A chave "anon" no site é pública por design e sozinha não lê nada. |
@@ -34,13 +36,16 @@ autenticador protegido, não deixar o PC destravado, e guardar os backups em loc
 4. **Authentication → Multi-Factor:** confira se **TOTP** está habilitado (é o padrão).
 5. **Authentication → URL Configuration:** em **Site URL** e **Redirect URLs**, coloque o endereço do site
    (ex.: `https://SEU-USUARIO.github.io/neto-crm/`) e, para desenvolvimento, `http://localhost:5173/`.
-6. **Authentication → Users → Add user → Create new user:** e-mail e senha do dentista
-   (marque *Auto Confirm User*).
-7. Libere esse usuário no **SQL Editor**:
+6. **Edge Functions → Deploy a new function → Via Editor:** nome `usuarios`, cole
+   `supabase/functions/usuarios/index.ts` e clique em **Deploy function**
+   (ou `supabase functions deploy usuarios` pela CLI).
+7. **Primeiro administrador** (só uma vez): em **Authentication → Users → Add user → Create new user**,
+   crie o seu login (marque *Auto Confirm User*) e libere no **SQL Editor**:
    ```sql
-   insert into public.membros (user_id, nome)
-   select id, 'Dr. Fulano' from auth.users where email = 'email@do-dentista.com';
+   insert into public.membros (user_id, nome, admin)
+   select id, 'Seu nome', true from auth.users where email = 'seu@email.com';
    ```
+   Daqui em diante, os outros dentistas são criados pelo próprio app, em **Usuários**.
 
 ### 2. Rodar localmente
 ```bash
@@ -69,8 +74,9 @@ npm run dev
 - **Plano gratuito do Supabase:** o projeto é pausado após ~1 semana sem nenhum acesso. É só
   reativar no painel, sem perda de dados. O plano gratuito também não oferece backups para baixar,
   por isso o botão de backup do app.
-- **Perdeu o celular do autenticador:** o administrador remove o fator do usuário em
-  **Authentication → Users → (usuário) → MFA factors**. No próximo login o app pede para cadastrar de novo.
+- **Esqueceu a senha ou perdeu o celular do autenticador:** o administrador usa **Nova senha** ou
+  **Zerar autenticador** na tela **Usuários**. No próximo login o app pede para criar a senha ou
+  cadastrar o autenticador de novo.
 - **LGPD:** são dados pessoais de saúde. Coletar só o necessário (CPF é opcional de propósito),
   e excluir os dados de um paciente se ele pedir.
 - **Dois consultórios:** já funciona. É o mesmo site e o mesmo banco, basta entrar de outro PC.

@@ -251,6 +251,7 @@ export async function editorOrcamento(alvo: HTMLElement, id: number | null) {
       btnSalvar,
       id ? h('a', { class: 'botao secundario', href: `#/orcamentos/${id}/imprimir`, target: '_blank', rel: 'noopener' }, 'Imprimir / PDF') : null,
       msg,
+      id ? botaoExcluir(id) : null,
     ),
   );
 
@@ -258,7 +259,6 @@ export async function editorOrcamento(alvo: HTMLElement, id: number | null) {
     alvo,
     h('div', { class: 'barra' }, h('h1', null, id ? `Orçamento #${id}` : 'Novo orçamento'), h('a', { href: '#/orcamentos' }, '← Orçamentos')),
     form,
-    id ? botaoExcluir(id) : null,
   );
 }
 
@@ -279,7 +279,7 @@ function botaoExcluir(id: number) {
     },
     'Excluir orçamento',
   );
-  return h('section', { class: 'zona-perigo' }, btn, msg);
+  return h('span', { class: 'excluir' }, msg, btn);
 }
 
 export async function imprimirOrcamento(alvo: HTMLElement, id: number) {

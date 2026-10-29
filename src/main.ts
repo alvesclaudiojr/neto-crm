@@ -15,10 +15,12 @@ import { listaOrcamentos, editorOrcamento, imprimirOrcamento } from './pages/orc
 import { listaClientes, fichaCliente } from './pages/clientes';
 import { paginaProcedimentos } from './pages/procedimentos';
 import { paginaConfiguracoes } from './pages/configuracoes';
+import { paginaUsuarios } from './pages/usuarios';
 
 const root = document.getElementById('app')!;
 let recuperandoSenha = false;
 let nomeUsuario = '';
+let ehAdmin = false;
 
 supabase.auth.onAuthStateChange((evento) => {
   // não chamar o Supabase direto dentro do callback (pode travar): agenda
@@ -33,6 +35,7 @@ supabase.auth.onAuthStateChange((evento) => {
 async function iniciar() {
   if (!configurado) return telaConfigFaltando(root);
   nomeUsuario = '';
+  ehAdmin = false;
   try {
     const { data } = await supabase.auth.getSession();
     if (!data.session) return telaLogin(root, iniciar);
@@ -48,10 +51,22 @@ async function iniciar() {
       });
     }
     const membro = must(
-      await supabase.from('membros').select('nome').eq('user_id', data.session.user.id).maybeSingle(),
+      await supabase.from('membros').select('nome, admin, trocar_senha').eq('user_id', data.session.user.id).maybeSingle(),
     );
     if (!membro) return telaSemAcesso(root);
+    if (membro.trocar_senha) {
+      return telaNovaSenha(
+        root,
+        async () => {
+          must(await supabase.rpc('senha_trocada'));
+          iniciar();
+        },
+        'Crie sua senha',
+        'Você entrou com uma senha provisória. Crie agora a sua senha pessoal; só você vai saber.',
+      );
+    }
 
+    ehAdmin = membro.admin;
     nomeUsuario = membro.nome;
     rotear();
   } catch (e) {
@@ -65,6 +80,8 @@ const MENU: [string, string][] = [
   ['#/procedimentos', 'Procedimentos'],
   ['#/configuracoes', 'Configurações'],
 ];
+// a tela some do menu para quem não é admin; quem decide de verdade é a Edge Function
+const MENU_ADMIN: [string, string] = ['#/usuarios', 'Usuários'];
 
 async function rotear() {
   const caminho = location.hash.replace(/^#\/?/, '').split('?')[0];
@@ -88,7 +105,7 @@ async function rotear() {
       h(
         'nav',
         null,
-        MENU.map(([href, rotulo]) =>
+        [...MENU, ...(ehAdmin ? [MENU_ADMIN] : [])].map(([href, rotulo]) =>
           h('a', { href, class: href.slice(2) === secao ? 'ativo' : null }, rotulo),
         ),
       ),
@@ -107,6 +124,10 @@ async function rotear() {
         return paginaProcedimentos(conteudo);
       case 'configuracoes':
         return paginaConfiguracoes(conteudo);
+      case 'usuarios':
+        if (ehAdmin) return paginaUsuarios(conteudo);
+        location.hash = '#/orcamentos';
+        return;
       default:
         location.hash = '#/orcamentos';
     }

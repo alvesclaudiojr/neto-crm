@@ -1,7 +1,7 @@
 import { supabase, must } from './lib/supabase';
 import { h, mount, lerForm, campo, aviso, acao } from './lib/dom';
 
-type Seguir = () => void;
+type Seguir = () => void | Promise<void>;
 
 function cartao(titulo: string, ...conteudo: (Node | null)[]) {
   return h('main', { class: 'tela-auth' }, h('section', { class: 'cartao' }, h('h1', null, titulo), ...conteudo));
@@ -72,7 +72,7 @@ function telaEsqueci(root: HTMLElement, seguir: Seguir) {
   mount(root, cartao('Recuperar senha', form));
 }
 
-export function telaNovaSenha(root: HTMLElement, seguir: Seguir) {
+export function telaNovaSenha(root: HTMLElement, seguir: Seguir, titulo = 'Criar nova senha', explicacao?: string) {
   const msg = h('div');
   const btn = h('button', { type: 'submit' }, 'Salvar senha');
   const form = h(
@@ -84,16 +84,18 @@ export function telaNovaSenha(root: HTMLElement, seguir: Seguir) {
         acao(btn, msg, async () => {
           validarSenha(senha, confirma);
           must(await supabase.auth.updateUser({ password: senha }));
-          seguir();
+          await seguir();
         });
       },
     },
+    explicacao ? h('p', null, explicacao) : null,
     campo('Nova senha', h('input', { name: 'senha', type: 'password', required: true, minLength: 10, autocomplete: 'new-password' }), 'Mínimo de 10 caracteres.'),
     campo('Repita a senha', h('input', { name: 'confirma', type: 'password', required: true, autocomplete: 'new-password' })),
     msg,
     btn,
+    botaoSair(),
   );
-  mount(root, cartao('Criar nova senha', form));
+  mount(root, cartao(titulo, form));
 }
 
 export function validarSenha(senha: string, confirma: string) {

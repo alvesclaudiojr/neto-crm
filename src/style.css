@@ -86,7 +86,8 @@ button.link { background: none; border: none; color: var(--primaria); padding: 0
 .barra h1, .barra h2 { margin: 0; flex: 1; }
 .busca { width: 100%; margin-bottom: 1rem; }
 .dica, .vazio { color: var(--suave); }
-.campo { display: grid; gap: 0.3rem; }
+/* align-content: campos com e sem dica na mesma linha da grade ficam com o input na mesma altura */
+.campo { display: grid; gap: 0.3rem; align-content: start; }
 .campo > span { font-weight: 600; font-size: 0.9rem; }
 .campo small { color: var(--suave); }
 .grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
@@ -126,7 +127,12 @@ table.itens { margin: 1rem 0; display: block; overflow-x: auto; }
 .historico p { margin: 0.2rem 0 0; white-space: pre-wrap; }
 .simples { padding-left: 1.2rem; }
 .simples li { margin-bottom: 0.4rem; }
-.zona-perigo { border-color: #fecdca !important; }
+.campo-check { display: flex; align-items: center; gap: 0.5rem; grid-column: 1 / -1; }
+.campo-check input { width: auto; }
+.botoes-linha { display: flex; gap: 0.4rem; flex-wrap: wrap; justify-content: flex-end; }
+.linha-senha { display: flex; align-items: center; gap: 0.75rem; margin: 0.4rem 0; }
+.senha-provisoria { font-size: 1.3rem; letter-spacing: 0.08em; padding: 0.3rem 0.6rem; background: var(--superficie); border-radius: 6px; user-select: all; }
+.excluir { margin-left: auto; display: flex; align-items: center; gap: 0.75rem; }
 .pre { white-space: pre-wrap; }
 
 /* folha de orçamento */
